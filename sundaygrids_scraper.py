@@ -10,8 +10,8 @@ EXCEL_OUTPUT_FILE = "sundaygrids_detailed_report.xlsx"
 TARGET_PROJECTS = ["Ara 40", "Venera 130", "Soho 195"]
 
 
-def parse_drawer_metrics(text):
-    """Extracts structured metrics from the full side-drawer text."""
+def parse_drawer_metrics(text, period_label):
+    """Extracts structured metrics and assigns correct date ranges."""
     def grab(pattern):
         m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
         return m.group(1).strip() if m else "N/A"
@@ -26,7 +26,24 @@ def parse_drawer_metrics(text):
         if match:
             credits_earned = match.group(1).strip()
 
-    date_range = grab(r"([A-Za-z]+\s+\d+,\s+\d+\s*[-–]\s*[^\n]+|[A-Za-z]+\s+\d+\s*[-–]\s*[^\n]+)")
+    current_year = pd.Timestamp.now().year
+    if period_label == "Today":
+        date_range = pd.Timestamp.now().strftime("%b %d, %Y")
+    elif period_label == "This Month":
+        date_range = f"Nov 1, {current_year} - today"
+    elif period_label.startswith("Month - "):
+        month_name = period_label.replace("Month - ", "")
+        month_map = {
+            "Jan": f"Jan 1 - Jan 31, {current_year}", "Feb": f"Feb 1 - Feb 28, {current_year}",
+            "Mar": f"Mar 1 - Mar 31, {current_year}", "Apr": f"Apr 1 - Apr 30, {current_year}",
+            "May": f"May 1 - May 31, {current_year}", "Jun": f"Jun 1 - Jun 30, {current_year}",
+            "Jul": f"Jul 1 - Jul 31, {current_year}", "Aug": f"Aug 1 - Aug 31, {current_year}",
+            "Sep": f"Sep 1 - Sep 30, {current_year}", "Oct": f"Oct 1 - Oct 31, {current_year}",
+            "Nov": f"Nov 1 - Nov 30, {current_year}", "Dec": f"Dec 1 - Dec 31, {current_year}"
+        }
+        date_range = month_map.get(month_name, f"{month_name}, {current_year}")
+    else:
+        date_range = grab(r"([A-Za-z]+\s+\d+,\s+\d+\s*[-–]\s*[^\n]+|[A-Za-z]+\s+\d+\s*[-–]\s*[^\n]+)")
 
     return {
         "Date Range": date_range,
@@ -95,7 +112,7 @@ def run_sundaygrids_scraper():
                 all_time_btn.click()
                 time.sleep(1.2)
 
-            all_time_metrics = parse_drawer_metrics(get_full_drawer_text(page))
+            all_time_metrics = parse_drawer_metrics(get_full_drawer_text(page), "All Time")
             earned_val = all_time_metrics["Credits Earned"]
             if earned_val == "N/A":
                 earned_val = all_time_metrics["Estimated Credits"]
@@ -117,7 +134,7 @@ def run_sundaygrids_scraper():
                 if tab_btn.count() > 0:
                     tab_btn.click()
                     time.sleep(1.2)
-                    m = parse_drawer_metrics(get_full_drawer_text(page))
+                    m = parse_drawer_metrics(get_full_drawer_text(page), period_label)
                     history_records.append({
                         "Timestamp": timestamp,
                         "Project Name": proj_name,
@@ -150,18 +167,19 @@ def run_sundaygrids_scraper():
                         try:
                             pill = month_pills.nth(idx)
                             if not pill.is_visible():
-                                continue  # Instant skip for hidden months
+                                continue
 
                             pill.scroll_into_view_if_needed()
                             month_name = pill.inner_text().strip()
                             pill.click()
                             time.sleep(1.2)
 
-                            m = parse_drawer_metrics(get_full_drawer_text(page))
+                            period_key = f"Month - {month_name}"
+                            m = parse_drawer_metrics(get_full_drawer_text(page), period_key)
                             history_records.append({
                                 "Timestamp": timestamp,
                                 "Project Name": proj_name,
-                                "Period": f"Month - {month_name}",
+                                "Period": period_key,
                                 "Date Range": m["Date Range"],
                                 "Capacity Reserved": m["Capacity Reserved"],
                                 "Energy Produced": m["Energy Produced"],
