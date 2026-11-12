@@ -1,0 +1,13 @@
+# Playwright browser persistent profile (contains login cookies/tokens)
+playwright_session/
+
+# Generated Excel reports
+sundaygrids_detailed_report.xlsx
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# macOS system files (if applicable)
+.DS_Store
